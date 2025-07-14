@@ -1067,6 +1067,9 @@
                 <button class="console-btn" id="consoleBtn">
                     🖥️ Console
                 </button>
+                <button class="console-btn" id="refreshBtn" onclick="requestSystemRefresh()">
+                    🔄 Refresh
+                </button>
                 <button class="rimo-btn" onclick="showRimoInfo()">
                     👨‍💼 RIMO
                 </button>
@@ -1353,6 +1356,7 @@
         function checkTimeouts() {
             const now = Date.now();
             let hasChanges = false;
+            let timeoutCount = 0;
             
             for (const floor in rooms) {
                 rooms[floor].forEach(room => {
@@ -1363,20 +1367,23 @@
                             room.status = 'undefined';
                             room.mode = 'undefined';
                             hasChanges = true;
-                            console.log(`⚠️ TIMEOUT: ${room.name} - Nessun aggiornamento da ${room.lastUpdate ? Math.round((now - room.lastUpdate) / 1000) : 'mai'} secondi`);
+                            timeoutCount++;
+                            const timeoutSeconds = room.lastUpdate ? Math.round((now - room.lastUpdate) / 1000) : 'mai';
+                            console.log(`⚠️ TIMEOUT: ${room.name} - Nessun aggiornamento da ${timeoutSeconds} secondi`);
                         }
                     }
                 });
             }
             
             if (hasChanges) {
+                console.log(`🔄 Timeout rilevati: ${timeoutCount} dispositivi - Aggiornamento UI`);
                 updateAllRoomCards();
                 updateStatistics();
             }
         }
 
-        // Avvia controllo timeout ogni 30 secondi
-        setInterval(checkTimeouts, 30000);
+        // Avvia controllo timeout ogni 15 secondi (più frequente)
+        setInterval(checkTimeouts, 15000);
 
         // Inizializzazione dashboard
         function initializeDashboard() {
@@ -1409,8 +1416,12 @@
                         MQTT_CONFIG.connected = false;
                         updateMQTTStatus('disconnected', 'Connessione persa: ' + responseObject.errorMessage);
                         
+                        // Marca tutti i dispositivi come timeout se perdiamo la connessione
+                        markAllDevicesAsTimeout();
+                        
                         setTimeout(() => {
                             if (!MQTT_CONFIG.connected) {
+                                console.log("🔄 Tentativo riconnessione automatica...");
                                 connectMQTT();
                             }
                         }, 5000);
@@ -1418,15 +1429,9 @@
                 };
                 
                 MQTT_CONFIG.client.onMessageArrived = function(message) {
-                	console.log("📨 MQTT RAW - Topic:", message.destinationName, "- Payload length:", message.payloadString.length);
                     console.log("📥 Messaggio MQTT ricevuto:", message.destinationName, message.payloadString);
                     handleMQTTMessage(message.destinationName, message.payloadString);
                 };
-
-MQTT_CONFIG.client.onMessageArrived = function(message) {
-    console.log("📥 Messaggio MQTT ricevuto:", message.destinationName, message.payloadString);
-    handleMQTTMessage(message.destinationName, message.payloadString);
-};
                 
                 const connectOptions = {
                     onSuccess: function() {
@@ -1434,11 +1439,21 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
                         MQTT_CONFIG.connected = true;
                         updateMQTTStatus('connected', 'Connesso a ' + MQTT_CONFIG.host);
                         subscribeToTopics();
+                        
+                        // Richiedi immediatamente lo stato quando ci riconnettiamo
+                        setTimeout(() => {
+                            console.log("🔄 Richiesta stato sistema dopo riconnessione");
+                            requestSystemRefresh();
+                        }, 2000);
                     },
                     onFailure: function(message) {
                         console.log("❌ Connessione MQTT fallita:", message.errorMessage);
                         MQTT_CONFIG.connected = false;
                         updateMQTTStatus('disconnected', 'Errore: ' + message.errorMessage);
+                        
+                        // Marca tutti i dispositivi come timeout
+                        markAllDevicesAsTimeout();
+                        
                         setTimeout(connectMQTT, 10000);
                     },
                     timeout: 10,
@@ -1452,6 +1467,57 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
             } catch (error) {
                 console.error("❌ Errore inizializzazione MQTT:", error);
                 updateMQTTStatus('disconnected', 'Errore inizializzazione');
+                markAllDevicesAsTimeout();
+            }
+        }
+
+        // Marca tutti i dispositivi come in timeout
+        function markAllDevicesAsTimeout() {
+            console.log("⚠️ Marcando tutti i dispositivi come timeout...");
+            let changedCount = 0;
+            
+            for (const floor in rooms) {
+                rooms[floor].forEach(room => {
+                    if (room.status !== 'undefined') {
+                        room.status = 'undefined';
+                        room.mode = 'undefined';
+                        room.lastUpdate = null;
+                        changedCount++;
+                    }
+                });
+            }
+            
+            if (changedCount > 0) {
+                console.log(`🔄 ${changedCount} dispositivi marcati come timeout`);
+                updateAllRoomCards();
+                updateStatistics();
+            }
+        }
+
+        // Richiedi refresh dello stato sistema
+        function requestSystemRefresh() {
+            if (!MQTT_CONFIG.connected || !MQTT_CONFIG.client) {
+                console.log("❌ Impossibile richiedere refresh: MQTT non connesso");
+                return;
+            }
+            
+            try {
+                const refreshRequest = {
+                    action: "refresh_status",
+                    timestamp: Date.now()
+                };
+                
+                const message = new Paho.MQTT.Message(JSON.stringify(refreshRequest));
+                message.destinationName = "magalini/system/refresh";
+                message.qos = 0;
+                message.retained = false;
+                MQTT_CONFIG.client.send(message);
+                
+                console.log("📡 Richiesta refresh stato sistema inviata");
+                showNotification("🔄 Richiesta aggiornamento stato...", 'info', 3000);
+                
+            } catch (error) {
+                console.error("❌ Errore richiesta refresh:", error);
             }
         }
 
@@ -1479,13 +1545,6 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
 
         // Gestisce messaggi MQTT dal topic unificato
 		function handleMQTTMessage(topic, payload) {
-
-// LOG TEMPORANEO - RIMUOVERE DOPO TEST
-    if (!topic.endsWith('/request')) {
-        console.log("🔴 MESSAGGIO NON-REQUEST RICEVUTO:", topic);
-    }
-
-
             try {
                 console.log('=====================================');
                 console.log('📥 NUOVO MESSAGGIO MQTT');
@@ -1562,7 +1621,7 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
 
                 const now = Date.now();
                 let updatedRooms = 0;
-                let timeoutRooms = 0;
+                let hasChanges = false;
 
                 for (const [floorName, floorData] of Object.entries(data.floors)) {
                     console.log(`🏢 Processando piano: ${floorName}`);
@@ -1581,40 +1640,61 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
                             continue;
                         }
 
-                        // Siccome non abbiamo più lastUpdate nel JSON, usa sempre il timestamp corrente
-                        const lastUpdate = now;
-                        const isTimeout = false; // Mai in timeout quando ricevi un aggiornamento fresco
-
+                        // Salva stati precedenti per confronto
                         const oldStatus = room.status;
-                        room.lastUpdate = lastUpdate;
+                        const oldTemperature = room.temperature;
+                        const oldMode = room.mode;
 
-                        // Quando ricevi un aggiornamento, non è mai in timeout
-                        room.status = roomData.status || 'undefined';
+                        // Aggiorna timestamp
+                        room.lastUpdate = now;
+
+                        // Aggiorna status (inversione on/off per correggere logica Java)
+                        const newStatus = roomData.status || 'undefined';
+                        room.status = newStatus;
+                        
+                        // Aggiorna mode se presente
                         room.mode = roomData.mode || 'undefined';
 
+                        // Aggiorna temperatura se presente
                         if (roomData.temperature !== undefined && roomData.temperature !== null) {
                             room.temperature = parseFloat(roomData.temperature);
                         }
 
-                        updatedRooms++;
-                        console.log(`✅ ${room.name}: ${room.status.toUpperCase()} (${room.mode}) ${room.temperature ? room.temperature.toFixed(1) + '°C' : ''}`);
+                        // Verifica se ci sono stati cambiamenti significativi
+                        const statusChanged = oldStatus !== room.status;
+                        const tempChanged = Math.abs((oldTemperature || 0) - (room.temperature || 0)) > 0.1;
+                        const modeChanged = oldMode !== room.mode;
 
-                        // Aggiorna la card solo se lo stato è cambiato
-                        if (oldStatus !== room.status) {
+                        if (statusChanged || tempChanged || modeChanged) {
+                            hasChanges = true;
                             updateRoomCard(roomId, room);
+                            
+                            console.log(`🔄 CAMBIAMENTO ${room.name}:`);
+                            if (statusChanged) console.log(`   📊 Status: ${oldStatus} → ${room.status}`);
+                            if (modeChanged) console.log(`   ⚙️ Mode: ${oldMode} → ${room.mode}`);
+                            if (tempChanged) console.log(`   🌡️ Temp: ${oldTemperature?.toFixed(1)}°C → ${room.temperature?.toFixed(1)}°C`);
                         }
+
+                        updatedRooms++;
+                        console.log(`✅ ${room.name}: ${room.status.toUpperCase()} (${room.mode}) ${room.temperature ? room.temperature.toFixed(1) + '°C' : 'N/A'}`);
                     }
                 }
 
-                console.log(`📊 Aggiornamento completato: ${updatedRooms} stanze aggiornate`);
+                console.log(`📊 Aggiornamento completato: ${updatedRooms} stanze processate`);
+                
+                // Aggiorna sempre le statistiche e tutte le card per assicurare coerenza
+                if (hasChanges) {
+                    console.log("🔄 Rilevati cambiamenti - Aggiornamento completo UI");
+                    updateAllRoomCards();
+                }
                 updateStatistics();
+                
                 console.log("📊 ==========================================");
 
             } catch (error) {
                 console.error("❌ Errore handleSystemStatus:", error);
             }
         }
-
 
         // Gestisce gli orari settimanali
         function handleWeeklySchedule(roomId, scheduleData) {
@@ -1623,20 +1703,29 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
                 console.log("🏠 Room ID:", roomId);
                 console.log("📊 Tipo dati ricevuti:", typeof scheduleData);
                 console.log("📋 Dati grezzi:", scheduleData);
-                
+
                 const room = findRoomById(roomId);
                 const roomName = room ? room.name : roomId;
-                
+
                 let processedSchedule = null;
-                
-                if (scheduleData && scheduleData.schedule) {
-                    console.log("✅ Trovata proprietà 'schedule':", scheduleData.schedule);
+
+                // NUOVO FORMATO COMPRESSO
+                if (scheduleData && scheduleData.s && Array.isArray(scheduleData.s)) {
+                    console.log("✅ Formato compresso rilevato - array s trovato");
+                    console.log("📊 Dimensione array: " + scheduleData.s.length + " giorni");
+                    processedSchedule = scheduleData.s; // È già un array 7x24
+                } 
+                // VECCHIO FORMATO (per retrocompatibilità)
+                else if (scheduleData && scheduleData.schedule) {
+                    console.log("✅ Formato classico rilevato");
                     processedSchedule = convertScheduleFormat(scheduleData.schedule);
-                } else if (scheduleData && typeof scheduleData === 'object') {
+                } 
+                // PROVA A INTERPRETARE DIRETTAMENTE
+                else if (scheduleData && typeof scheduleData === 'object') {
                     console.log("🔍 Tentativo conversione diretta dell'oggetto");
                     processedSchedule = convertScheduleFormat(scheduleData);
                 }
-                
+
                 if (processedSchedule) {
                     console.log("✅ Schedule processato correttamente:", processedSchedule);
                     showScheduleModal(roomName, processedSchedule);
@@ -1645,9 +1734,9 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
                     console.error("❌ Impossibile processare i dati del schedule");
                     showNotification('❌ Formato dati orari non riconosciuto', 'error');
                 }
-                
+
                 console.log("📅 ============================================");
-                
+
             } catch (error) {
                 console.error("❌ Errore handleWeeklySchedule:", error);
                 showNotification('❌ Errore visualizzazione orari', 'error');
@@ -1715,101 +1804,110 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
             }
         }
 
-// Genera HTML per la visualizzazione degli orari
-function generateScheduleHTML(scheduleData) {
-    try {
-        const daysOfWeek = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
-        
-        // Ottieni il giorno corrente (0 = Domenica, 1 = Lunedì, ..., 6 = Sabato)
-        const today = new Date().getDay();
-        // Converti al formato array (0 = Lunedì, 1 = Martedì, ..., 6 = Domenica)
-        const todayIndex = today === 0 ? 6 : today - 1;
-        
-        // Riorganizza l'array dei giorni partendo da oggi
-        const reorderedDays = [];
-        const reorderedIndices = [];
-        
-        for (let i = 0; i < 7; i++) {
-            const dayIndex = (todayIndex + i) % 7;
-            reorderedDays.push(daysOfWeek[dayIndex]);
-            reorderedIndices.push(dayIndex);
-        }
-        
-        console.log(`📅 Oggi è ${daysOfWeek[todayIndex]}, riordinando giorni:`, reorderedDays);
-        
-        let html = `
-            <div class="schedule-grid">
-                <div class="day-label">Giorno</div>
-        `;
-        
-        for (let hour = 0; hour < 24; hour++) {
-            html += `<div class="hour-header">${hour.toString().padStart(2, '0')}</div>`;
-        }
-        
-        // Usa l'ordine riorganizzato dei giorni
-        for (let displayIndex = 0; displayIndex < 7; displayIndex++) {
-            const actualDayIndex = reorderedIndices[displayIndex];
-            const dayName = reorderedDays[displayIndex];
-            
-            // Aggiungi indicatore per il giorno corrente
-            const isToday = displayIndex === 0;
-            const dayLabel = isToday ? `📍 ${dayName} (OGGI)` : dayName;
-            
-            html += `<div class="day-label" ${isToday ? 'style="background: linear-gradient(135deg, #10b981, #059669); color: white; font-weight: 700;"' : ''}>${dayLabel}</div>`;
-            
-            for (let hour = 0; hour < 24; hour++) {
-                html += `<div class="time-cell">`;
+        // Genera HTML per la visualizzazione degli orari
+        function generateScheduleHTML(scheduleData) {
+            try {
+                const daysOfWeek = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
                 
-                for (let segment = 0; segment < 8; segment++) {
-                    const isActive = isTimeSegmentActive(scheduleData, actualDayIndex, hour, segment);
+                // Ottieni il giorno corrente (0 = Domenica, 1 = Lunedì, ..., 6 = Sabato)
+                const today = new Date().getDay();
+                
+                // CORREZIONE: Mapping tra getDay() e indici Java
+                // Java: [0=dom, 1=lun, 2=mar, 3=mer, 4=gio, 5=ven, 6=sab]
+                // getDay(): [0=dom, 1=lun, 2=mar, 3=mer, 4=gio, 5=ven, 6=sab]
+                // Quindi today corrisponde già all'indice Java!
+                const todayJavaIndex = today; // 0=dom, 1=lun, ..., 6=sab nell'array Java
+                
+                // Converti l'indice Java al formato di visualizzazione (0=lun, 1=mar, ..., 6=dom)
+                const todayDisplayIndex = todayJavaIndex === 0 ? 6 : todayJavaIndex - 1;
+                
+                // Riorganizza l'array dei giorni partendo da oggi
+                const reorderedDays = [];
+                const reorderedJavaIndices = []; // Indici nell'array Java originale
+                
+                for (let i = 0; i < 7; i++) {
+                    const displayIndex = (todayDisplayIndex + i) % 7;
+                    const javaIndex = displayIndex === 6 ? 0 : displayIndex + 1; // Converte display->java
                     
-                    const segmentMinutes = [
-                        { start: 0, end: 7 },   
-                        { start: 8, end: 14 },  
-                        { start: 15, end: 22 }, 
-                        { start: 23, end: 29 }, 
-                        { start: 30, end: 37 }, 
-                        { start: 38, end: 44 }, 
-                        { start: 45, end: 52 }, 
-                        { start: 53, end: 59 }  
-                    ];
-                    
-                    const segInfo = segmentMinutes[segment];
-                    const timeRange = `${hour.toString().padStart(2, '0')}:${segInfo.start.toString().padStart(2, '0')}-${hour.toString().padStart(2, '0')}:${segInfo.end.toString().padStart(2, '0')}`;
-                    
-                    html += `<div class="time-segment ${isActive ? 'active' : ''}" 
-                             title="${dayName} ${timeRange}${isActive ? ' (ATTIVO)' : ' (spento)'}"></div>`;
+                    reorderedDays.push(daysOfWeek[displayIndex]);
+                    reorderedJavaIndices.push(javaIndex);
                 }
                 
-                html += `</div>`;
+                console.log(`📅 Oggi è ${daysOfWeek[todayDisplayIndex]} (Java index: ${todayJavaIndex}), riordinando giorni:`, reorderedDays);
+                
+                let html = `
+                    <div class="schedule-grid">
+                        <div class="day-label">Giorno</div>
+                `;
+                
+                for (let hour = 0; hour < 24; hour++) {
+                    html += `<div class="hour-header">${hour.toString().padStart(2, '0')}</div>`;
+                }
+                
+                // Usa l'ordine riorganizzato dei giorni con i corretti indici Java
+                for (let displayIndex = 0; displayIndex < 7; displayIndex++) {
+                    const javaArrayIndex = reorderedJavaIndices[displayIndex]; // Indice nell'array Java
+                    const dayName = reorderedDays[displayIndex];
+                    
+                    // Aggiungi indicatore per il giorno corrente
+                    const isToday = displayIndex === 0;
+                    const dayLabel = isToday ? `📍 ${dayName} (OGGI)` : dayName;
+                    
+                    html += `<div class="day-label" ${isToday ? 'style="background: linear-gradient(135deg, #10b981, #059669); color: white; font-weight: 700;"' : ''}>${dayLabel}</div>`;
+                    
+                    for (let hour = 0; hour < 24; hour++) {
+                        html += `<div class="time-cell">`;
+                        
+                        for (let segment = 0; segment < 8; segment++) {
+                            const isActive = isTimeSegmentActive(scheduleData, javaArrayIndex, hour, segment);
+                            
+                            const segmentMinutes = [
+                                { start: 0, end: 7 },   
+                                { start: 8, end: 14 },  
+                                { start: 15, end: 22 }, 
+                                { start: 23, end: 29 }, 
+                                { start: 30, end: 37 }, 
+                                { start: 38, end: 44 }, 
+                                { start: 45, end: 52 }, 
+                                { start: 53, end: 59 }  
+                            ];
+                            
+                            const segInfo = segmentMinutes[segment];
+                            const timeRange = `${hour.toString().padStart(2, '0')}:${segInfo.start.toString().padStart(2, '0')}-${hour.toString().padStart(2, '0')}:${segInfo.end.toString().padStart(2, '0')}`;
+                            
+                            html += `<div class="time-segment ${isActive ? 'active' : ''}" 
+                                     title="${dayName} ${timeRange}${isActive ? ' (ATTIVO)' : ' (spento)'}"></div>`;
+                        }
+                        
+                        html += `</div>`;
+                    }
+                }
+                
+                html += `
+                    </div>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color active"></div>
+                            <span>Fancoil Attivo</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color inactive"></div>
+                            <span>Fancoil Spento</span>
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.85rem; color: #0369a1;">
+                        <strong>💡 Come leggere:</strong> Ogni ora è divisa in 8 segmenti di ~7-8 minuti. 
+                        Passa il mouse sui segmenti per vedere l'orario esatto. Il giorno corrente è evidenziato in verde.
+                    </div>
+                `;
+                
+                return html;
+                
+            } catch (error) {
+                console.error("❌ Errore generateScheduleHTML:", error);
+                return '<p>Errore nella visualizzazione degli orari</p>';
             }
         }
-        
-        html += `
-            </div>
-            <div class="legend">
-                <div class="legend-item">
-                    <div class="legend-color active"></div>
-                    <span>Fancoil Attivo</span>
-                </div>
-                <div class="legend-item">
-                    <div class="legend-color inactive"></div>
-                    <span>Fancoil Spento</span>
-                </div>
-            </div>
-            <div style="margin-top: 15px; padding: 10px; background: #f0f9ff; border-radius: 6px; font-size: 0.85rem; color: #0369a1;">
-                <strong>💡 Come leggere:</strong> Ogni ora è divisa in 8 segmenti di ~7-8 minuti. 
-                Passa il mouse sui segmenti per vedere l'orario esatto. Il giorno corrente è evidenziato in verde.
-            </div>
-        `;
-        
-        return html;
-        
-    } catch (error) {
-        console.error("❌ Errore generateScheduleHTML:", error);
-        return '<p>Errore nella visualizzazione degli orari</p>';
-    }
-}
 
         // Verifica se un segmento di tempo è attivo
         function isTimeSegmentActive(scheduleData, day, hour, segment) {
@@ -2341,93 +2439,114 @@ function generateScheduleHTML(scheduleData) {
             return null;
         }
 
-        // updateRoomCard con gestione timeout
+        // updateRoomCard con gestione timeout e logging migliorato
         function updateRoomCard(roomId, room) {
             const card = document.getElementById(`room_${roomId}`);
-            if (card) {
-                card.className = `room-card ${room.status}`;
+            if (!card) {
+                console.warn(`⚠️ Card non trovata per room: ${roomId}`);
+                return;
+            }
+            
+            // Debug dettagliato
+            console.log(`🔄 Aggiornamento card ${room.name}:`, {
+                status: room.status,
+                mode: room.mode,
+                temperature: room.temperature,
+                lastUpdate: room.lastUpdate ? new Date(room.lastUpdate).toLocaleTimeString() : 'mai'
+            });
+            
+            card.className = `room-card ${room.status}`;
+            
+            const statusElement = card.querySelector('.fancoil-status');
+            let statusText = {
+                'on': 'Spento',
+                'off': 'Acceso', 
+                'undefined': 'Non disponibile'
+            }[room.status] || 'Sconosciuto';
+            
+            if (room.mode && room.mode !== 'undefined') {
+                const modeText = {
+                    'manual': 'M',
+                    'auto': 'A'
+                }[room.mode] || '';
                 
-                const statusElement = card.querySelector('.fancoil-status');
-                let statusText = {
-                    'on': 'Spento',
-                    'off': 'Acceso',
-                    'undefined': 'Non disponibile'
-                }[room.status] || 'Sconosciuto';
-                
-                if (room.mode && room.mode !== 'undefined') {
-                    const modeText = {
-                        'manual': 'M',
-                        'auto': 'A'
-                    }[room.mode] || '';
-                    
-                    if (modeText) {
-                        statusText += ` (${modeText})`;
-                    }
-                }
-                
-                statusElement.className = `fancoil-status ${room.status}`;
-                statusElement.innerHTML = `<span>●</span><span>${statusText}</span>`;
-                
-                // Gestione indicatore timeout
-                const now = Date.now();
-                const isTimeout = room.lastUpdate && (now - room.lastUpdate) > TIMEOUT_MS;
-                
-                let timeoutIndicator = card.querySelector('.timeout-indicator');
-                if (isTimeout) {
-                    const timeoutSeconds = Math.round((now - room.lastUpdate) / 1000);
-                    if (!timeoutIndicator) {
-                        timeoutIndicator = document.createElement('div');
-                        timeoutIndicator.className = 'timeout-indicator';
-                        const roomHeader = card.querySelector('.room-header');
-                        roomHeader.insertAdjacentElement('afterend', timeoutIndicator);
-                    }
-                    timeoutIndicator.innerHTML = `⚠️ Connessione persa (Timeout ${timeoutSeconds}s)`;
-                } else if (timeoutIndicator) {
-                    timeoutIndicator.remove();
-                }
-                
-                // Aggiorna temperatura
-                const hasTemperature = ['pianoInterrato', 'palestra'].some(floor => 
-                    rooms[floor] && rooms[floor].find(r => r.id === roomId)
-                );
-                
-                if (hasTemperature) {
-                    let tempContainer = card.querySelector('.temperature-display');
-                    
-                    if (room.temperature !== null && room.status !== 'undefined') {
-                        if (!tempContainer) {
-                            const scheduleControls = card.querySelector('.schedule-controls');
-                            tempContainer = document.createElement('div');
-                            tempContainer.className = 'temperature-display';
-                            card.insertBefore(tempContainer, scheduleControls);
-                        }
-                        
-                        // Gestione errore sonda per temperature > 3000
-                        if (room.temperature > 3000) {
-                            tempContainer.style.background = 'rgba(239, 68, 68, 0.7)';
-                            tempContainer.innerHTML = `<span style="color: white; font-weight: 600;">⚠️ Errore Sonda</span>`;
-                        } else {
-                            tempContainer.style.background = 'rgba(255, 255, 255, 0.5)'; // Reset sfondo normale
-                            tempContainer.innerHTML = `
-                                <span class="temp-value">${room.temperature.toFixed(1)}</span>
-                                <span class="temp-unit">°C</span>
-                                <div style="margin-left: auto; font-size: 0.8rem; color: #64748b;">
-                                    Temp. attuale
-                                </div>
-                            `;
-                        }
-                    } else {
-                        if (!tempContainer) {
-                            const scheduleControls = card.querySelector('.schedule-controls');
-                            tempContainer = document.createElement('div');
-                            tempContainer.className = 'temperature-display';
-                            card.insertBefore(tempContainer, scheduleControls);
-                        }
-                        tempContainer.style.background = 'rgba(255, 255, 255, 0.5)'; // Reset sfondo normale
-                        tempContainer.innerHTML = `<span class="temp-unavailable">Temperatura non disponibile</span>`;
-                    }
+                if (modeText) {
+                    statusText += ` (${modeText})`;
                 }
             }
+            
+            if (statusElement) {
+                statusElement.className = `fancoil-status ${room.status}`;
+                statusElement.innerHTML = `<span>●</span><span>${statusText}</span>`;
+            }
+            
+            // Gestione indicatore timeout
+            const now = Date.now();
+            const isTimeout = room.lastUpdate && (now - room.lastUpdate) > TIMEOUT_MS;
+            
+            let timeoutIndicator = card.querySelector('.timeout-indicator');
+            if (isTimeout) {
+                const timeoutSeconds = Math.round((now - room.lastUpdate) / 1000);
+                if (!timeoutIndicator) {
+                    timeoutIndicator = document.createElement('div');
+                    timeoutIndicator.className = 'timeout-indicator';
+                    const roomHeader = card.querySelector('.room-header');
+                    if (roomHeader) {
+                        roomHeader.insertAdjacentElement('afterend', timeoutIndicator);
+                    }
+                }
+                timeoutIndicator.innerHTML = `⚠️ Connessione persa (Timeout ${timeoutSeconds}s)`;
+            } else if (timeoutIndicator) {
+                timeoutIndicator.remove();
+            }
+            
+            // Aggiorna temperatura per piano interrato e palestra
+            const hasTemperature = ['pianoInterrato', 'palestra'].some(floor => 
+                rooms[floor] && rooms[floor].find(r => r.id === roomId)
+            );
+            
+            if (hasTemperature) {
+                let tempContainer = card.querySelector('.temperature-display');
+                
+                if (room.temperature !== null && room.status !== 'undefined') {
+                    if (!tempContainer) {
+                        const scheduleControls = card.querySelector('.schedule-controls');
+                        tempContainer = document.createElement('div');
+                        tempContainer.className = 'temperature-display';
+                        if (scheduleControls) {
+                            card.insertBefore(tempContainer, scheduleControls);
+                        }
+                    }
+                    
+                    // Gestione errore sonda per temperature > 3000
+                    if (room.temperature > 3000) {
+                        tempContainer.style.background = 'rgba(239, 68, 68, 0.7)';
+                        tempContainer.innerHTML = `<span style="color: white; font-weight: 600;">⚠️ Errore Sonda</span>`;
+                    } else {
+                        tempContainer.style.background = 'rgba(255, 255, 255, 0.5)';
+                        tempContainer.innerHTML = `
+                            <span class="temp-value">${room.temperature.toFixed(1)}</span>
+                            <span class="temp-unit">°C</span>
+                            <div style="margin-left: auto; font-size: 0.8rem; color: #64748b;">
+                                Temp. attuale
+                            </div>
+                        `;
+                    }
+                } else {
+                    if (!tempContainer) {
+                        const scheduleControls = card.querySelector('.schedule-controls');
+                        tempContainer = document.createElement('div');
+                        tempContainer.className = 'temperature-display';
+                        if (scheduleControls) {
+                            card.insertBefore(tempContainer, scheduleControls);
+                        }
+                    }
+                    tempContainer.style.background = 'rgba(255, 255, 255, 0.5)';
+                    tempContainer.innerHTML = `<span class="temp-unavailable">Temperatura non disponibile</span>`;
+                }
+            }
+            
+            console.log(`✅ Card aggiornata per ${room.name}: ${room.status} ${room.temperature ? room.temperature.toFixed(1) + '°C' : ''}`);
         }
 
         // Aggiorna tutte le card
