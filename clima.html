@@ -1418,6 +1418,7 @@
                 };
                 
                 MQTT_CONFIG.client.onMessageArrived = function(message) {
+                	console.log("📨 MQTT RAW - Topic:", message.destinationName, "- Payload length:", message.payloadString.length);
                     console.log("📥 Messaggio MQTT ricevuto:", message.destinationName, message.payloadString);
                     handleMQTTMessage(message.destinationName, message.payloadString);
                 };
