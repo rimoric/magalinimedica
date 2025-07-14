@@ -1480,7 +1480,11 @@
                 
                 if (topic === TOPICS.SYSTEM_STATUS) {
                     handleSystemStatus(message);
-                } else if (topic.includes('/weekly_schedule/')) {
+                } else if (topic === TOPICS.WEEKLY_REQUEST) {
+                    // Ignora l'echo della richiesta
+                    console.log("📤 Echo richiesta orari ignorato (normale comportamento MQTT)");
+                } else if (topic.includes('/weekly_schedule/') && !topic.endsWith('/request')) {
+                    // Processa solo le risposte, non le richieste
                     const roomId = topic.split('/').pop();
                     handleWeeklySchedule(roomId, message);
                 } else if (topic === TOPICS.SYSTEM_COMMAND) {
