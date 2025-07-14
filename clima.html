@@ -1210,7 +1210,7 @@
         const MQTT_CONFIG = {
             host: 'broker.emqx.io',
             port: 8084,
-            clientId: 'magalini_medica_dashboard_' + Math.random().toString(16).substr(2, 8),
+            clientId: 'MagaliniWeb_' + Date.now() + '_' + Math.random().toString(16).substr(2, 8),
             connected: false,
             client: null
         };
@@ -1463,13 +1463,17 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
                 TOPICS.SYSTEM_COMMAND
             ];
 
+			let delay = 0;
             topics.forEach(topic => {
-                try {
-                    MQTT_CONFIG.client.subscribe(topic);
-                    console.log("✅ Sottoscritto a:", topic);
-                } catch (error) {
-                    console.error("❌ Errore sottoscrizione a", topic, error);
-                }
+            	setTimeout(() => {
+                	try {
+                    	MQTT_CONFIG.client.subscribe(topic);
+                    	console.log("✅ Sottoscritto a:", topic);
+                	} catch (error) {
+                    	console.error("❌ Errore sottoscrizione a", topic, error);
+                	}
+                }, delay);
+        		delay += 500; // 500ms tra ogni sottoscrizione
             });
         }
 
@@ -1534,78 +1538,6 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
             }
         }
 
-        // Gestisce il messaggio di stato unificato
-        function handleSystemStatus(data) {
-            try {
-                console.log("📊 ===== AGGIORNAMENTO STATO SISTEMA =====");
-                console.log("🏠 Timestamp sistema:", data.timestamp);
-                console.log("📋 Floors ricevuti:", Object.keys(data.floors || {}));
-                
-                if (!data.floors) {
-                    console.error("❌ Dati floors non trovati nel messaggio");
-                    return;
-                }
-                
-                const now = Date.now();
-                let updatedRooms = 0;
-                let timeoutRooms = 0;
-                
-                for (const [floorName, floorData] of Object.entries(data.floors)) {
-                    console.log(`🏢 Processando piano: ${floorName}`);
-                    
-                    const floorKey = mapFloorName(floorName);
-                    if (!floorKey || !rooms[floorKey]) {
-                        console.warn(`⚠️ Piano ${floorName} non riconosciuto`);
-                        continue;
-                    }
-                    
-                    for (const [roomId, roomData] of Object.entries(floorData)) {
-                        const room = rooms[floorKey].find(r => r.id === roomId);
-                        
-                        if (!room) {
-                            console.warn(`⚠️ Stanza ${roomId} non trovata in ${floorKey}`);
-                            continue;
-                        }
-                        
-                        const lastUpdate = roomData.lastUpdate || 0;
-                        const isTimeout = (now - lastUpdate) > TIMEOUT_MS;
-                        
-                        const oldStatus = room.status;
-                        room.lastUpdate = lastUpdate;
-                        
-                        if (isTimeout) {
-                            room.status = 'undefined';
-                            room.mode = 'undefined';
-                            room.temperature = null;
-                            timeoutRooms++;
-                            console.log(`⚠️ ${room.name}: TIMEOUT (${Math.round((now - lastUpdate) / 1000)}s ago)`);
-                        } else {
-                            room.status = roomData.status || 'undefined';
-                            room.mode = roomData.mode || 'undefined';
-                            
-                            if (roomData.temperature !== undefined && roomData.temperature !== null) {
-                                room.temperature = parseFloat(roomData.temperature);
-                            }
-                            
-                            updatedRooms++;
-                            console.log(`✅ ${room.name}: ${room.status.toUpperCase()} (${room.mode}) ${room.temperature ? room.temperature.toFixed(1) + '°C' : ''}`);
-                        }
-                        
-                        if (oldStatus !== room.status) {
-                            updateRoomCard(roomId, room);
-                        }
-                    }
-                }
-                
-                console.log(`📊 Aggiornamento completato: ${updatedRooms} stanze attive, ${timeoutRooms} in timeout`);
-                updateStatistics();
-                console.log("📊 ==========================================");
-                
-            } catch (error) {
-                console.error("❌ Errore handleSystemStatus:", error);
-            }
-        }
-
         // Mappa nomi piani dal payload ai nomi locali
         function mapFloorName(floorName) {
             const mapping = {
@@ -1615,6 +1547,74 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
             };
             return mapping[floorName] || null;
         }
+
+        // Gestisce il messaggio di stato unificato
+        function handleSystemStatus(data) {
+            try {
+                console.log("📊 ===== AGGIORNAMENTO STATO SISTEMA =====");
+                console.log("🏠 Timestamp sistema:", data.timestamp);
+                console.log("📋 Floors ricevuti:", Object.keys(data.floors || {}));
+
+                if (!data.floors) {
+                    console.error("❌ Dati floors non trovati nel messaggio");
+                    return;
+                }
+
+                const now = Date.now();
+                let updatedRooms = 0;
+                let timeoutRooms = 0;
+
+                for (const [floorName, floorData] of Object.entries(data.floors)) {
+                    console.log(`🏢 Processando piano: ${floorName}`);
+
+                    const floorKey = mapFloorName(floorName);
+                    if (!floorKey || !rooms[floorKey]) {
+                        console.warn(`⚠️ Piano ${floorName} non riconosciuto`);
+                        continue;
+                    }
+
+                    for (const [roomId, roomData] of Object.entries(floorData)) {
+                        const room = rooms[floorKey].find(r => r.id === roomId);
+
+                        if (!room) {
+                            console.warn(`⚠️ Stanza ${roomId} non trovata in ${floorKey}`);
+                            continue;
+                        }
+
+                        // Siccome non abbiamo più lastUpdate nel JSON, usa sempre il timestamp corrente
+                        const lastUpdate = now;
+                        const isTimeout = false; // Mai in timeout quando ricevi un aggiornamento fresco
+
+                        const oldStatus = room.status;
+                        room.lastUpdate = lastUpdate;
+
+                        // Quando ricevi un aggiornamento, non è mai in timeout
+                        room.status = roomData.status || 'undefined';
+                        room.mode = roomData.mode || 'undefined';
+
+                        if (roomData.temperature !== undefined && roomData.temperature !== null) {
+                            room.temperature = parseFloat(roomData.temperature);
+                        }
+
+                        updatedRooms++;
+                        console.log(`✅ ${room.name}: ${room.status.toUpperCase()} (${room.mode}) ${room.temperature ? room.temperature.toFixed(1) + '°C' : ''}`);
+
+                        // Aggiorna la card solo se lo stato è cambiato
+                        if (oldStatus !== room.status) {
+                            updateRoomCard(roomId, room);
+                        }
+                    }
+                }
+
+                console.log(`📊 Aggiornamento completato: ${updatedRooms} stanze aggiornate`);
+                updateStatistics();
+                console.log("📊 ==========================================");
+
+            } catch (error) {
+                console.error("❌ Errore handleSystemStatus:", error);
+            }
+        }
+
 
         // Gestisce gli orari settimanali
         function handleWeeklySchedule(roomId, scheduleData) {
