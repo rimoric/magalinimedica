@@ -1475,6 +1475,13 @@ MQTT_CONFIG.client.onMessageArrived = function(message) {
 
         // Gestisce messaggi MQTT dal topic unificato
 		function handleMQTTMessage(topic, payload) {
+
+// LOG TEMPORANEO - RIMUOVERE DOPO TEST
+    if (!topic.endsWith('/request')) {
+        console.log("🔴 MESSAGGIO NON-REQUEST RICEVUTO:", topic);
+    }
+
+
             try {
                 console.log('=====================================');
                 console.log('📥 NUOVO MESSAGGIO MQTT');
