@@ -1422,6 +1422,11 @@
                     console.log("📥 Messaggio MQTT ricevuto:", message.destinationName, message.payloadString);
                     handleMQTTMessage(message.destinationName, message.payloadString);
                 };
+
+MQTT_CONFIG.client.onMessageArrived = function(message) {
+    console.log("📥 Messaggio MQTT ricevuto:", message.destinationName, message.payloadString);
+    handleMQTTMessage(message.destinationName, message.payloadString);
+};
                 
                 const connectOptions = {
                     onSuccess: function() {
@@ -1469,30 +1474,56 @@
         }
 
         // Gestisce messaggi MQTT dal topic unificato
-        function handleMQTTMessage(topic, payload) {
+		function handleMQTTMessage(topic, payload) {
             try {
                 console.log('=====================================');
                 console.log('📥 NUOVO MESSAGGIO MQTT');
                 console.log('📍 Topic:', topic);
                 console.log('📄 Payload:', payload);
                 console.log('=====================================');
-                
-                const message = JSON.parse(payload);
-                
+
+                let message;
+                let isJson = true;
+
+                // Prova a parsare come JSON
+                try {
+                    message = JSON.parse(payload);
+                } catch (parseError) {
+                    // Se non è JSON, usa il payload come stringa
+                    console.log("ℹ️ Payload non è JSON, processando come testo");
+                    message = payload;
+                    isJson = false;
+                }
+
+                // Processa in base al topic
                 if (topic === TOPICS.SYSTEM_STATUS) {
-                    handleSystemStatus(message);
+                    if (isJson) {
+                        handleSystemStatus(message);
+                    } else {
+                        console.error("❌ System status deve essere JSON");
+                    }
                 } else if (topic === TOPICS.WEEKLY_REQUEST) {
                     // Ignora l'echo della richiesta
                     console.log("📤 Echo richiesta orari ignorato (normale comportamento MQTT)");
                 } else if (topic.includes('/weekly_schedule/') && !topic.endsWith('/request')) {
                     // Processa solo le risposte, non le richieste
                     const roomId = topic.split('/').pop();
-                    handleWeeklySchedule(roomId, message);
+                    if (isJson) {
+                        handleWeeklySchedule(roomId, message);
+                    } else {
+                        console.error("❌ Weekly schedule deve essere JSON");
+                    }
                 } else if (topic === TOPICS.SYSTEM_COMMAND) {
                     console.log("📊 Comando sistema:", message);
+                } else {
+                    console.log("⚠️ Topic non gestito:", topic);
                 }
+
             } catch (error) {
-                console.error("❌ Errore parsing messaggio MQTT:", error, payload);
+                console.error("❌ Errore handleMQTTMessage:", error);
+                console.error("Topic:", topic);
+                console.error("Payload:", payload);
+                error.printStackTrace ? error.printStackTrace() : console.error(error.stack);
             }
         }
 
