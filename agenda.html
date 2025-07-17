@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Appuntamenti | MagaliniMedica</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+            font-size: 2.2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .status-item.connected {
+            background: #d1fae5;
+            color: #065f46;
+            border-color: #10b981;
+        }
+
+        .status-item.loading {
+            background: #fef3c7;
+            color: #92400e;
+            border-color: #f59e0b;
+        }
+
+        .status-item.error {
+            background: #fecaca;
+            color: #991b1b;
+            border-color: #ef4444;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .credentials-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 1fr;
+            gap: 15px;
+            align-items: end;
+        }
+
+        .console-panel {
+            background: rgba(30, 30, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid #4a5568;
+        }
+
+        .console-header {
+            background: linear-gradient(135deg, #2d3748, #4a5568);
+            color: white;
+            padding: 15px 25px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .console-header h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .console-buttons {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .console-content {
+            background: #1a202c;
+            color: #e2e8f0;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85rem;
+            padding: 20px;
+            border-radius: 0 0 15px 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            min-height: 200px;
+        }
+
+        .console-line {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .console-line.info {
+            color: #63b3ed;
+        }
+
+        .console-line.success {
+            color: #68d391;
+        }
+
+        .console-line.warning {
+            color: #fbd38d;
+        }
+
+        .console-line.error {
+            color: #fc8181;
+        }
+
+        .console-line.request {
+            color: #d6bcfa;
+        }
+
+        .console-line.response {
+            color: #9ae6b4;
+        }
+
+        .appointments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .room-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .room-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .room-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .room-title {
+            font-size: 1.4rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .room-stats {
+            display: flex;
+            gap: 15px;
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .stat-badge {
+            background: #f1f5f9;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-weight: 500;
+        }
+
+        .schedule-display {
+            background: #f8fafc;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .week-grid {
+            display: grid;
+            grid-template-columns: 80px repeat(24, 1fr);
+            gap: 1px;
+            background: #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .day-label {
+            background: #64748b;
+            color: white;
+            padding: 8px 4px;
+            text-align: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .hour-cell {
+            background: white;
+            min-height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+
+        .hour-cell.occupied {
+            background: linear-gradient(135deg, #00ff00, #32cd32);
+            color: #003300;
+            font-weight: 600;
+        }
+
+        .hour-cell.partial {
+            background: linear-gradient(135deg, #99ff00, #adff2f);
+            color: #003300;
+            font-weight: 600;
+        }
+
+        .hour-cell:hover {
+            transform: scale(1.1);
+            z-index: 10;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+
+        .time-header {
+            background: #334155;
+            color: white;
+            font-size: 0.7rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+
+        .appointments-list {
+            max-height: 200px;
+            overflow-y: auto;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .appointment-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f1f5f9;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .appointment-item:last-child {
+            border-bottom: none;
+        }
+
+        .appointment-time {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .appointment-date {
+            font-size: 0.9rem;
+            color: #64748b;
+        }
+
+        .appointment-duration {
+            font-size: 0.8rem;
+            background: #f1f5f9;
+            padding: 2px 6px;
+            border-radius: 4px;
+            color: #64748b;
+        }
+
+        .summary-stats {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #64748b;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1001;
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            max-width: 350px;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .notification.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .notification.info {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 768px) {
+            .container { padding: 10px; }
+            .header h1 { font-size: 1.8rem; }
+            .appointments-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .week-grid { 
+                grid-template-columns: 60px repeat(12, 1fr);
+                font-size: 0.6rem;
+            }
+            .time-header {
+                writing-mode: horizontal-tb;
+                text-orientation: initial;
+                font-size: 0.6rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>
+                📅 MagaliniMedica Appuntamenti
+            </h1>
+            <div class="connection-status">
+                <div class="status-item" id="apiStatus">
+                    <span>🌐 API Status:</span>
+                    <span id="apiStatusText">Pronto</span>
+                </div>
+                <div class="status-item" id="webServiceStatus">
+                    <span>🔗 Web Service:</span>
+                    <span id="webServiceStatusText">In attesa...</span>
+                </div>
+                <div class="status-item">
+                    <span>📊 Ultimo Aggiornamento:</span>
+                    <span id="lastUpdate">--:--</span>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-primary" onclick="loadAppointments()">
+                    <span class="loading-spinner" id="loadSpinner" style="display: none;"></span>
+                    🔄 Aggiorna Appuntamenti
+                </button>
+                <button class="btn btn-success" onclick="loadNext7Days()">
+                    📅 Prossimi 7 Giorni
+                </button>
+                <button class="btn btn-primary" onclick="testConnection()">
+                    🧪 Test Connessione
+                </button>
+            </div>
+        </div>
+
+        <!-- Form Credenziali e Configurazione -->
+        <div class="credentials-form">
+            <h2 style="margin-bottom: 20px; color: #2c3e50;">🔑 Configurazione API</h2>
+            
+            <!-- Credenziali -->
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" value="magalini" />
+                </div>
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="text" id="password" value="3Ottobre!" />
+                </div>
+                <div class="form-group">
+                    <label for="authKey">Auth Key</label>
+                    <input type="text" id="authKey" value="JZ9CWJ1DDKYW6J4PTRAUKG" />
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-success" onclick="saveCredentials()">💾 Salva</button>
+                </div>
+            </div>
+            
+            <!-- Periodo Richiesta -->
+            <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid #e2e8f0;">
+                <h3 style="margin-bottom: 15px; color: #374151;">📅 Periodo Richiesta</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="dateFrom">Data Inizio</label>
+                        <input type="datetime-local" id="dateFrom" />
+                    </div>
+                    <div class="form-group">
+                        <label for="dateTo">Data Fine</label>
+                        <input type="datetime-local" id="dateTo" />
+                    </div>
+                    <div class="form-group">
+                        <label for="quickSelect">Scelta Rapida</label>
+                        <select id="quickSelect" onchange="applyQuickSelect()">
+                            <option value="">-- Scegli periodo --</option>
+                            <option value="today">Solo oggi</option>
+                            <option value="tomorrow">Solo domani</option>
+                            <option value="3days">Prossimi 3 giorni</option>
+                            <option value="7days" selected>Prossimi 7 giorni</option>
+                            <option value="14days">Prossimi 14 giorni</option>
+                            <option value="custom">Personalizzato</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <button class="btn btn-primary" onclick="toggleConsole()">
+                            📟 Console
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Console Debug -->
+        <div class="console-panel" id="consolePanel" style="display: none;">
+            <div class="console-header">
+                <h3>📟 Console Debug</h3>
+                <div class="console-buttons">
+                    <button class="btn btn-primary" onclick="clearConsole()">🗑️ Clear</button>
+                    <button class="btn btn-primary" onclick="toggleConsole()">✖️ Chiudi</button>
+                </div>
+            </div>
+            <div class="console-content" id="consoleContent">
+                <div class="console-line info">Dashboard MagaliniMedica - API aggiornata</div>
+            </div>
+        </div>
+
+        <!-- Statistiche Riepilogative -->
+        <div class="summary-stats">
+            <h2 style="margin-bottom: 20px; color: #2c3e50;">📊 Riepilogo Appuntamenti</h2>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalAppointments">0</div>
+                    <div class="stat-label">Appuntamenti Totali</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="activeRooms">0</div>
+                    <div class="stat-label">Locali Attivi</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalHours">0</div>
+                    <div class="stat-label">Ore Programmate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgDuration">0</div>
+                    <div class="stat-label">Durata Media (min)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Griglia Appuntamenti per Locale -->
+        <div class="appointments-grid" id="appointmentsGrid">
+            <!-- Le card dei locali verranno generate dinamicamente -->
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // ========================================================================
+        // CONFIGURAZIONE v2.1 - API AGGIORNATA
+        // ========================================================================
+        
+        const CONFIG = {
+            // API MagaliniMedica DIRETTA (aggiornata senza porta 440)
+            API_URL: 'https://magalini.vettoreweb.it/api/SchedulerAPI/GetWorklist',
+            EXCLUDED_ACTIVITY_TYPES: new Set([128, 144, 162]),
+            
+            // ===== CONFIGURAZIONE STANZE SEMPLIFICATA =====
+            ROOM_CONFIGURATIONS: {
+                // PIANO TERRA
+                'B01': { plcId: 'PT', description: 'Ambulatorio 1' },
+                'B02': { plcId: 'PT', description: 'Ambulatorio 2' },
+                'B03': { plcId: 'PT', description: 'Ambulatorio 2' },  // Mappato su B02
+                'B04': { plcId: 'PT', description: 'Ambulatorio 2' },  // Mappato su B02
+                'B05': { plcId: 'PT', description: 'Ambulatorio 5' },
+                'B06': { plcId: 'PT', description: 'Ambulatorio 6' },
+                'B07': { plcId: 'PT', description: 'Ambulatorio 7' },
+                'B08': { plcId: 'PT', description: 'Ambulatorio 8' },
+                'B09': { plcId: 'PT', description: 'Ambulatorio 9' },
+                
+                // PIANO INTERRATO
+                'B11': { plcId: 'PI', description: 'Ambulatorio 11' },
+                'B12': { plcId: 'PI', description: 'Ambulatorio 12' },
+                'B13': { plcId: 'PI', description: 'Ambulatorio 13' },
+                'B14': { plcId: 'PI', description: 'Ambulatorio 14' },
+                
+                // PALESTRA - SALE RIABILITATIVE
+                '0SR1': { plcId: 'PA', description: 'Sala Riabilitativa 1' },
+                '0SR2': { plcId: 'PA', description: 'Sala Riabilitativa 2' },
+                '0SR3': { plcId: 'PA', description: 'Sala Riabilitativa 3' },
+                '0SR4': { plcId: 'PA', description: 'Sala Riabilitativa 4' },
+                '0SR5': { plcId: 'PA', description: 'Sala Riabilitativa 5' },
+                '0SR6': { plcId: 'PA', description: 'Sala Riabilitativa 6' },
+                '0SR7': { plcId: 'PA', description: 'Sala Riabilitativa 7' },
+                
+                // RISONANZA MAGNETICA
+                'ASpace1': { plcId: 'PA', description: 'Risonanza Magnetica 1' },
+                'ASpace2': { plcId: 'PA', description: 'Risonanza Magnetica 2' }
+            }
+        };
+
+        // Stato applicazione
+        let currentCredentials = {
+            username: 'magalini',
+            password: '3Ottobre!',
+            authKey: 'JZ9CWJ1DDKYW6J4PTRAUKG'
+        };
+        let appointmentsData = [];
+        let processedSchedules = {};
+        let isLoading = false;
+        let consoleVisible = false;
+
+        // ========== STORAGE SICURO MULTI-PIATTAFORMA ==========
+        
+        const StorageManager = {
+            // Chiave di storage
+            STORAGE_KEY: 'magalini_credentials',
+            
+            // Verifica disponibilità localStorage
+            isLocalStorageAvailable() {
+                try {
+                    const test = '__localStorage_test__';
+                    localStorage.setItem(test, test);
+                    localStorage.removeItem(test);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            },
+            
+            // Verifica disponibilità sessionStorage
+            isSessionStorageAvailable() {
+                try {
+                    const test = '__sessionStorage_test__';
+                    sessionStorage.setItem(test, test);
+                    sessionStorage.removeItem(test);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            },
+            
+            // Salva credenziali con fallback
+            save(credentials) {
+                const data = JSON.stringify(credentials);
+                let saved = false;
+                let method = '';
+                
+                // Prova localStorage
+                if (this.isLocalStorageAvailable()) {
+                    try {
+                        localStorage.setItem(this.STORAGE_KEY, data);
+                        saved = true;
+                        method = 'localStorage';
+                    } catch (e) {
+                        console.warn('localStorage save failed:', e);
+                    }
+                }
+                
+                // Fallback su sessionStorage
+                if (!saved && this.isSessionStorageAvailable()) {
+                    try {
+                        sessionStorage.setItem(this.STORAGE_KEY, data);
+                        saved = true;
+                        method = 'sessionStorage';
+                    } catch (e) {
+                        console.warn('sessionStorage save failed:', e);
+                    }
+                }
+                
+                // Ultimo fallback: cookie (solo per GitHub Pages)
+                if (!saved) {
+                    try {
+                        // Cookie con scadenza 30 giorni
+                        const expires = new Date();
+                        expires.setDate(expires.getDate() + 30);
+                        document.cookie = `${this.STORAGE_KEY}=${encodeURIComponent(data)}; expires=${expires.toUTCString()}; path=/; SameSite=Strict`;
+                        saved = true;
+                        method = 'cookie';
+                    } catch (e) {
+                        console.error('Cookie save failed:', e);
+                    }
+                }
+                
+                return { saved, method };
+            },
+            
+            // Carica credenziali con fallback
+            load() {
+                let data = null;
+                let method = '';
+                
+                // Prova localStorage
+                if (this.isLocalStorageAvailable()) {
+                    try {
+                        data = localStorage.getItem(this.STORAGE_KEY);
+                        if (data) method = 'localStorage';
+                    } catch (e) {
+                        console.warn('localStorage load failed:', e);
+                    }
+                }
+                
+                // Prova sessionStorage
+                if (!data && this.isSessionStorageAvailable()) {
+                    try {
+                        data = sessionStorage.getItem(this.STORAGE_KEY);
+                        if (data) method = 'sessionStorage';
+                    } catch (e) {
+                        console.warn('sessionStorage load failed:', e);
+                    }
+                }
+                
+                // Prova cookie
+                if (!data) {
+                    try {
+                        const cookies = document.cookie.split(';');
+                        for (let cookie of cookies) {
+                            const [name, value] = cookie.trim().split('=');
+                            if (name === this.STORAGE_KEY) {
+                                data = decodeURIComponent(value);
+                                method = 'cookie';
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Cookie load failed:', e);
+                    }
+                }
+                
+                if (data) {
+                    try {
+                        return { credentials: JSON.parse(data), method };
+                    } catch (e) {
+                        console.error('Parse credentials failed:', e);
+                    }
+                }
+                
+                return { credentials: null, method: 'none' };
+            },
+            
+            // Pulisci storage
+            clear() {
+                // Pulisci localStorage
+                if (this.isLocalStorageAvailable()) {
+                    try {
+                        localStorage.removeItem(this.STORAGE_KEY);
+                    } catch (e) {}
+                }
+                
+                // Pulisci sessionStorage
+                if (this.isSessionStorageAvailable()) {
+                    try {
+                        sessionStorage.removeItem(this.STORAGE_KEY);
+                    } catch (e) {}
+                }
+                
+                // Pulisci cookie
+                try {
+                    document.cookie = `${this.STORAGE_KEY}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+                } catch (e) {}
+            }
+        };
+
+        // ========== CONSOLE DEBUG ==========
+
+        function toggleConsole() {
+            consoleVisible = !consoleVisible;
+            const panel = document.getElementById('consolePanel');
+            panel.style.display = consoleVisible ? 'block' : 'none';
+            
+            if (consoleVisible) {
+                logToConsole('Console aperta', 'info');
+            }
+        }
+
+        function clearConsole() {
+            document.getElementById('consoleContent').innerHTML = '';
+            logToConsole('Console pulita', 'info');
+        }
+
+        function logToConsole(message, type = 'info') {
+            const console = document.getElementById('consoleContent');
+            const timestamp = new Date().toLocaleTimeString();
+            const line = document.createElement('div');
+            line.className = `console-line ${type}`;
+            line.textContent = `[${timestamp}] ${message}`;
+            console.appendChild(line);
+            console.scrollTop = console.scrollHeight;
+        }
+
+        // ========== GESTIONE DATE ==========
+
+        function initializeDates() {
+            const now = new Date();
+            const fromDate = new Date(now);
+            fromDate.setHours(0, 0, 0, 0);
+            
+            const toDate = new Date(fromDate);
+            toDate.setDate(fromDate.getDate() + 6);
+            toDate.setHours(23, 59, 59, 999);
+            
+            document.getElementById('dateFrom').value = formatDateTimeLocal(fromDate);
+            document.getElementById('dateTo').value = formatDateTimeLocal(toDate);
+        }
+
+        function formatDateTimeLocal(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            
+            return `${year}-${month}-${day}T${hours}:${minutes}`;
+        }
+
+        function applyQuickSelect() {
+            const select = document.getElementById('quickSelect');
+            const value = select.value;
+            
+            if (value === 'custom') {
+                logToConsole('Modalità data personalizzata selezionata', 'info');
+                return;
+            }
+            
+            const now = new Date();
+            let fromDate, toDate;
+            
+            switch (value) {
+                case 'today':
+                    fromDate = new Date(now);
+                    fromDate.setHours(0, 0, 0, 0);
+                    toDate = new Date(now);
+                    toDate.setHours(23, 59, 59, 999);
+                    break;
+                    
+                case 'tomorrow':
+                    fromDate = new Date(now);
+                    fromDate.setDate(now.getDate() + 1);
+                    fromDate.setHours(0, 0, 0, 0);
+                    toDate = new Date(fromDate);
+                    toDate.setHours(23, 59, 59, 999);
+                    break;
+                    
+                case '3days':
+                    fromDate = new Date(now);
+                    fromDate.setHours(0, 0, 0, 0);
+                    toDate = new Date(fromDate);
+                    toDate.setDate(fromDate.getDate() + 2);
+                    toDate.setHours(23, 59, 59, 999);
+                    break;
+                    
+                case '7days':
+                    fromDate = new Date(now);
+                    fromDate.setHours(0, 0, 0, 0);
+                    toDate = new Date(fromDate);
+                    toDate.setDate(fromDate.getDate() + 6);
+                    toDate.setHours(23, 59, 59, 999);
+                    break;
+                    
+                case '14days':
+                    fromDate = new Date(now);
+                    fromDate.setHours(0, 0, 0, 0);
+                    toDate = new Date(fromDate);
+                    toDate.setDate(fromDate.getDate() + 13);
+                    toDate.setHours(23, 59, 59, 999);
+                    break;
+                    
+                default:
+                    return;
+            }
+            
+            document.getElementById('dateFrom').value = formatDateTimeLocal(fromDate);
+            document.getElementById('dateTo').value = formatDateTimeLocal(toDate);
+            
+            logToConsole(`Periodo impostato: ${value}`, 'info');
+        }
+
+        // ========== CHIAMATA DIRETTA AL WEB SERVICE ==========
+
+        async function loadAppointments() {
+            if (isLoading) {
+                showNotification('⏳ Caricamento già in corso...', 'info');
+                return;
+            }
+
+            isLoading = true;
+            updateLoadingState(true);
+            
+            try {
+                const dateFromInput = document.getElementById('dateFrom').value;
+                const dateToInput = document.getElementById('dateTo').value;
+                
+                if (!dateFromInput || !dateToInput) {
+                    throw new Error('Seleziona data di inizio e fine');
+                }
+                
+                const dateFrom = new Date(dateFromInput);
+                const dateTo = new Date(dateToInput);
+                
+                const diffTime = Math.abs(dateTo - dateFrom);
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                
+                logToConsole(`Richiesta appuntamenti dal ${dateFrom.toLocaleDateString()} al ${dateTo.toLocaleDateString()} (${diffDays} giorni)`, 'info');
+                
+                updateStatus('webServiceStatus', 'loading', 'Download...');
+                showNotification('🔄 Download da API MagaliniMedica...', 'info');
+                
+                const requestData = {
+                    DateFrom: formatDateForAPI(dateFrom),
+                    DateTo: formatDateForAPI(dateTo),
+                    PlantId: 1,
+                    UserName: currentCredentials.username,
+                    Password: currentCredentials.password,
+                    AuthKey: currentCredentials.authKey
+                };
+                
+                logToConsole(`Chiamata diretta a: ${CONFIG.API_URL}`, 'request');
+                logToConsole(`Request data: ${JSON.stringify(requestData, null, 2)}`, 'request');
+                
+                const response = await fetchWithCORS(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(requestData)
+                });
+                
+                logToConsole(`Response status: ${response.status}`, 'response');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                logToConsole(`Response: ${data.Appointments?.length || 0} appuntamenti ricevuti`, 'response');
+                
+                const appointments = parseAppointments(data.Appointments || []);
+                appointmentsData = appointments;
+                
+                logToConsole(`Processati ${appointments.length} appuntamenti validi`, 'success');
+                
+                processSchedules();
+                
+                updateStatus('webServiceStatus', 'connected', `${appointments.length} appuntamenti`);
+                
+                renderAppointments();
+                updateSummaryStats();
+                
+                document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
+                showNotification(`✅ Caricati ${appointments.length} appuntamenti`, 'success');
+                logToConsole('Download completato con successo', 'success');
+                
+            } catch (error) {
+                console.error('❌ Errore caricamento appuntamenti:', error);
+                logToConsole(`ERRORE: ${error.message}`, 'error');
+                updateStatus('webServiceStatus', 'error', 'Errore');
+                showNotification(`❌ Errore: ${error.message}`, 'error');
+                
+            } finally {
+                isLoading = false;
+                updateLoadingState(false);
+            }
+        }
+
+        async function fetchWithCORS(url, options) {
+            // Chiamata diretta senza proxy CORS
+            return await fetch(url, options);
+        }
+
+        function formatDateForAPI(date) {
+            const isoString = date.toISOString();
+            return isoString.substring(0, 11) + "00:00:00.000Z";
+        }
+
+        async function testConnection() {
+            try {
+                showNotification('🧪 Test connessione API MagaliniMedica...', 'info');
+                logToConsole('Test connessione diretta all\'API...', 'info');
+                
+                const testData = {
+                    DateFrom: formatDateForAPI(new Date()),
+                    DateTo: formatDateForAPI(new Date()),
+                    PlantId: 1,
+                    UserName: currentCredentials.username,
+                    Password: currentCredentials.password,
+                    AuthKey: currentCredentials.authKey
+                };
+                
+                const response = await fetchWithCORS(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify(testData)
+                });
+                
+                logToConsole(`Test response: ${response.status}`, 'response');
+                
+                if (response.ok) {
+                    showNotification('✅ API MagaliniMedica raggiungibile', 'success');
+                    updateStatus('apiStatus', 'connected', 'Online');
+                    logToConsole('API MagaliniMedica raggiungibile', 'success');
+                } else {
+                    throw new Error(`API non disponibile (${response.status})`);
+                }
+                
+            } catch (error) {
+                console.error('Test connessione fallito:', error);
+                logToConsole(`Test connessione fallito: ${error.message}`, 'error');
+                showNotification('❌ API non raggiungibile', 'error');
+                updateStatus('apiStatus', 'error', 'Offline');
+            }
+        }
+
+        // ========== PROCESSAMENTO DATI ==========
+
+        function parseAppointments(appointmentsJson) {
+            const appointments = [];
+            
+            for (const appJson of appointmentsJson) {
+                const appointment = { activities: [] };
+                
+                if (appJson.Activities) {
+                    for (const actJson of appJson.Activities) {
+                        const activity = parseActivity(actJson);
+                        if (activity && activity.resources.length > 0) {
+                            appointment.activities.push(activity);
+                        }
+                    }
+                }
+                
+                if (appointment.activities.length > 0) {
+                    appointments.push(appointment);
+                }
+            }
+            
+            return appointments;
+        }
+
+        function parseActivity(activityJson) {
+            const activityType = activityJson.ActivityType;
+            if (!activityType) return null;
+            
+            const typeId = activityType.Id;
+            
+            // Escludi attività specifiche
+            if (CONFIG.EXCLUDED_ACTIVITY_TYPES.has(typeId)) {
+                return null;
+            }
+            
+            const activity = {
+                activityTypeId: typeId,
+                resources: []
+            };
+            
+            try {
+                activity.start = new Date(activityJson.Start);
+                activity.end = new Date(activityJson.End);
+                activity.durationMinutes = Math.round((activity.end - activity.start) / (1000 * 60));
+            } catch (e) {
+                logToConsole(`Errore parsing date attività: ${e.message}`, 'warning');
+                return null;
+            }
+            
+            if (activityJson.Resources) {
+                for (const resource of activityJson.Resources) {
+                    if (resource.name) {
+                        activity.resources.push(resource.name);
+                    }
+                }
+            }
+            
+            return activity;
+        }
+
+        function processSchedules() {
+            processedSchedules = {};
+            
+            // Inizializza array vuoti per ogni stanza CONFIGURATA
+            Object.keys(CONFIG.ROOM_CONFIGURATIONS).forEach(roomName => {
+                processedSchedules[roomName] = createEmptySchedule();
+            });
+            
+            let processedActivities = 0;
+            const foundResources = new Set();
+            const unmatchedResources = new Set();
+            
+            // Processa ogni appuntamento
+            appointmentsData.forEach(appointment => {
+                appointment.activities.forEach(activity => {
+                    activity.resources.forEach(roomId => {
+                        foundResources.add(roomId);
+                        
+                        // CERCA CORRISPONDENZA DIRETTA
+                        if (processedSchedules[roomId]) {
+                            applyActivityToSchedule(processedSchedules[roomId], activity);
+                            processedActivities++;
+                            
+                            // Se è B03 o B04, applica anche a B02
+                            if (roomId === 'B03' || roomId === 'B04') {
+                                applyActivityToSchedule(processedSchedules['B02'], activity);
+                            }
+                        } else {
+                            unmatchedResources.add(roomId);
+                        }
+                    });
+                });
+            });
+            
+            // Debug: mostra le risorse non corrispondenti
+            if (unmatchedResources.size > 0 && consoleVisible) {
+                logToConsole(`Risorse NON CORRISPONDENTI: ${unmatchedResources.size}`, 'warning');
+                Array.from(unmatchedResources).sort().forEach(resource => {
+                    logToConsole(`  ❌ "${resource}" non trovata in configurazione`, 'warning');
+                });
+            }
+            
+            logToConsole(`Processate ${processedActivities} attività negli schedule`, processedActivities > 0 ? 'success' : 'error');
+        }
+
+        function createEmptySchedule() {
+            const schedule = [];
+            for (let day = 0; day < 7; day++) {
+                schedule[day] = new Array(24).fill(0);
+            }
+            return schedule;
+        }
+
+        function applyActivityToSchedule(schedule, activity) {
+            const start = activity.start;
+            const end = activity.end;
+            
+            // Calcola giorno della settimana (0 = Domenica)
+            const dayOfWeek = start.getDay();
+            
+            const startMinutes = start.getHours() * 60 + start.getMinutes();
+            const endMinutes = end.getHours() * 60 + end.getMinutes();
+            
+            // Marca ogni ora che contiene parte dell'appuntamento
+            for (let hour = 0; hour < 24; hour++) {
+                // Verifica segmenti da 7.5 minuti
+                if ((hour*60 +  0) >= startMinutes && (hour*60 +  8) <= endMinutes) schedule[dayOfWeek][hour] |= 0x01;
+                if ((hour*60 +  8) >= startMinutes && (hour*60 + 15) <= endMinutes) schedule[dayOfWeek][hour] |= 0x02;
+                if ((hour*60 + 15) >= startMinutes && (hour*60 + 23) <= endMinutes) schedule[dayOfWeek][hour] |= 0x04;
+                if ((hour*60 + 23) >= startMinutes && (hour*60 + 30) <= endMinutes) schedule[dayOfWeek][hour] |= 0x08;
+                if ((hour*60 + 30) >= startMinutes && (hour*60 + 38) <= endMinutes) schedule[dayOfWeek][hour] |= 0x10;
+                if ((hour*60 + 38) >= startMinutes && (hour*60 + 45) <= endMinutes) schedule[dayOfWeek][hour] |= 0x20;
+                if ((hour*60 + 45) >= startMinutes && (hour*60 + 53) <= endMinutes) schedule[dayOfWeek][hour] |= 0x40;
+                if ((hour*60 + 53) >= startMinutes && (hour*60 + 60) <= endMinutes) schedule[dayOfWeek][hour] |= 0x80;
+            }
+        }
+
+        // ========== UI FUNCTIONS ==========
+
+        function renderAppointments() {
+            const grid = document.getElementById('appointmentsGrid');
+            grid.innerHTML = '';
+            
+            // Renderizza solo le stanze uniche (salta B03 e B04 che sono già in B02)
+            Object.keys(CONFIG.ROOM_CONFIGURATIONS).forEach(roomName => {
+                if (roomName === 'B03' || roomName === 'B04') {
+                    return; // Salta B03 e B04 nella visualizzazione
+                }
+                
+                const config = CONFIG.ROOM_CONFIGURATIONS[roomName];
+                const schedule = processedSchedules[roomName] || [];
+                const roomAppointments = getRoomAppointments(roomName);
+                
+                const card = createRoomCard(roomName, config, schedule, roomAppointments);
+                grid.appendChild(card);
+            });
+        }
+
+        function createRoomCard(roomName, config, schedule, appointments) {
+            const card = document.createElement('div');
+            card.className = 'room-card';
+            
+            const scheduledHours = countScheduledHours(schedule);
+            const totalAppointments = appointments.length;
+            const avgDuration = appointments.length > 0 ? 
+                Math.round(appointments.reduce((sum, apt) => sum + apt.duration, 0) / appointments.length) : 0;
+            
+            card.innerHTML = `
+                <div class="room-header">
+                    <div class="room-title">${roomName === 'B02' ? 'B02/B03/B04' : roomName} - ${config.description}</div>
+                    <div class="room-stats">
+                        <span class="stat-badge">${totalAppointments} app.</span>
+                        <span class="stat-badge">${scheduledHours}h</span>
+                        <span class="stat-badge">${avgDuration}min avg</span>
+                        <span class="stat-badge">PLC:${config.plcId}</span>
+                    </div>
+                </div>
+                
+                <div class="schedule-display">
+                    <h4 style="margin-bottom: 10px; color: #475569;">📅 Programmazione Settimanale</h4>
+                    ${createWeekGrid(schedule)}
+                </div>
+                
+                <div class="appointments-list">
+                    ${appointments.length > 0 ? 
+                        appointments.map(apt => createAppointmentItem(apt)).join('') :
+                        '<div style="padding: 20px; text-align: center; color: #64748b;">Nessun appuntamento</div>'
+                    }
+                </div>
+            `;
+            
+            return card;
+        }
+
+        function createWeekGrid(schedule) {
+            const days = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+            const hours = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0'));
+            
+            let html = '<div class="week-grid">';
+            
+            html += '<div class="day-label"></div>';
+            hours.forEach(hour => {
+                html += `<div class="time-header">${hour}</div>`;
+            });
+            
+            for (let day = 0; day < 7; day++) {
+                html += `<div class="day-label">${days[day]}</div>`;
+                
+                for (let hour = 0; hour < 24; hour++) {
+                    const hourData = schedule[day] ? schedule[day][hour] : 0;
+                    const occupancy = getOccupancyLevel(hourData);
+                    const cellClass = occupancy >= 1.0 ? 'occupied' : (occupancy > 0 ? 'partial' : '');
+                    const title = `${days[day]} ${hour.toString().padStart(2, '0')}:00 - ${Math.round(occupancy * 100)}% occupato`;
+                    
+                    html += `<div class="hour-cell ${cellClass}" title="${title}"></div>`;
+                }
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        function getOccupancyLevel(hourByte) {
+            if (hourByte === 0) return 0;
+            const setBits = (hourByte.toString(2).match(/1/g) || []).length;
+            return setBits / 8;
+        }
+
+        function createAppointmentItem(appointment) {
+            return `
+                <div class="appointment-item">
+                    <div>
+                        <div class="appointment-time">${appointment.timeRange}</div>
+                        <div class="appointment-date">${appointment.date}</div>
+                    </div>
+                    <div class="appointment-duration">${appointment.duration}min</div>
+                </div>
+            `;
+        }
+
+        function getRoomAppointments(roomName) {
+            const appointments = [];
+            const config = CONFIG.ROOM_CONFIGURATIONS[roomName];
+            
+            appointmentsData.forEach(appointment => {
+                appointment.activities.forEach(activity => {
+                    // Se stiamo cercando appuntamenti per B02, includiamo anche B03 e B04
+                    const searchRooms = roomName === 'B02' ? ['B02', 'B03', 'B04'] : [roomName];
+                    
+                    if (activity.resources.some(r => searchRooms.includes(r))) {
+                        const start = activity.start;
+                        const end = activity.end;
+                        
+                        appointments.push({
+                            date: start.toLocaleDateString('it-IT'),
+                            timeRange: `${start.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})} - ${end.toLocaleTimeString('it-IT', {hour: '2-digit', minute: '2-digit'})}`,
+                            duration: activity.durationMinutes,
+                            start: start,
+                            end: end,
+                            roomDisplay: config.description
+                        });
+                    }
+                });
+            });
+            
+            appointments.sort((a, b) => a.start - b.start);
+            return appointments;
+        }
+
+        function countScheduledHours(schedule) {
+            let count = 0;
+            schedule.forEach(day => {
+                day.forEach(hour => {
+                    if (hour !== 0) count++;
+                });
+            });
+            return count;
+        }
+
+        function updateSummaryStats() {
+            let totalAppointments = 0;
+            let activeRooms = 0;
+            let totalHours = 0;
+            let totalDuration = 0;
+            let appointmentCount = 0;
+            
+            Object.keys(CONFIG.ROOM_CONFIGURATIONS).forEach(roomName => {
+                const roomAppointments = getRoomAppointments(roomName);
+                const schedule = processedSchedules[roomName] || [];
+                
+                if (roomAppointments.length > 0) {
+                    activeRooms++;
+                    totalAppointments += roomAppointments.length;
+                    
+                    roomAppointments.forEach(apt => {
+                        totalDuration += apt.duration;
+                        appointmentCount++;
+                    });
+                }
+                
+                totalHours += countScheduledHours(schedule);
+            });
+            
+            document.getElementById('totalAppointments').textContent = totalAppointments;
+            document.getElementById('activeRooms').textContent = activeRooms;
+            document.getElementById('totalHours').textContent = totalHours;
+            document.getElementById('avgDuration').textContent = appointmentCount > 0 ? 
+                Math.round(totalDuration / appointmentCount) : 0;
+        }
+
+        function loadNext7Days() {
+            document.getElementById('quickSelect').value = '7days';
+            applyQuickSelect();
+            
+            showNotification('📅 Periodo impostato: prossimi 7 giorni', 'info');
+            logToConsole('Periodo impostato su prossimi 7 giorni', 'info');
+            
+            loadAppointments();
+        }
+
+        function saveCredentials() {
+            currentCredentials = {
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                authKey: document.getElementById('authKey').value
+            };
+            
+            const result = StorageManager.save(currentCredentials);
+            
+            if (result.saved) {
+                showNotification(`✅ Credenziali salvate (${result.method})`, 'success');
+                logToConsole(`Credenziali salvate per utente: ${currentCredentials.username} usando ${result.method}`, 'info');
+            } else {
+                showNotification('⚠️ Impossibile salvare le credenziali', 'error');
+                logToConsole('ERRORE: Impossibile salvare le credenziali su nessun storage', 'error');
+            }
+        }
+
+        function updateStatus(elementId, status, text) {
+            const element = document.getElementById(elementId);
+            const textElement = document.getElementById(elementId + 'Text');
+            
+            element.className = `status-item ${status}`;
+            textElement.textContent = text;
+        }
+
+        function updateLoadingState(loading) {
+            const spinner = document.getElementById('loadSpinner');
+            spinner.style.display = loading ? 'inline-block' : 'none';
+        }
+
+        function showNotification(message, type = 'info', duration = 4000) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, duration);
+        }
+
+        // ========== INIZIALIZZAZIONE ==========
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 MagaliniMedica Dashboard - API Aggiornata');
+            logToConsole('Dashboard MagaliniMedica inizializzata - API aggiornata', 'info');
+            
+            updateStatus('apiStatus', 'loading', 'Verifica...');
+            
+            initializeDates();
+            logToConsole('Date inizializzate con periodo 7 giorni', 'info');
+            
+            setTimeout(() => {
+                testConnection();
+            }, 1000);
+            
+            // Carica credenziali salvate
+            const savedData = StorageManager.load();
+            if (savedData.credentials) {
+                try {
+                    const creds = savedData.credentials;
+                    document.getElementById('username').value = creds.username || 'magalini';
+                    document.getElementById('password').value = creds.password || '3Ottobre!';
+                    document.getElementById('authKey').value = creds.authKey || 'JZ9CWJ1DDKYW6J4PTRAUKG';
+                    currentCredentials = creds;
+                    logToConsole(`Credenziali caricate da ${savedData.method}`, 'info');
+                } catch (e) {
+                    logToConsole('Errore caricamento credenziali salvate', 'warning');
+                }
+            } else {
+                logToConsole('Nessuna credenziale salvata trovata', 'info');
+            }
+            
+            logToConsole('Sistema pronto per l\'uso', 'success');
+        });
+
+        // Salva credenziali automaticamente
+        ['username', 'password', 'authKey'].forEach(id => {
+            document.getElementById(id).addEventListener('change', () => {
+                const creds = {
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value,
+                    authKey: document.getElementById('authKey').value
+                };
+                StorageManager.save(creds);
+            });
+        });
+
+        // Auto-refresh ogni 10 minuti
+        setInterval(() => {
+            if (!isLoading) {
+                console.log('🔄 Auto-refresh appuntamenti...');
+                logToConsole('Auto-refresh automatico', 'info');
+                loadAppointments();
+            }
+        }, 10 * 60 * 1000);
+    </script>
+</body>
+</html>
